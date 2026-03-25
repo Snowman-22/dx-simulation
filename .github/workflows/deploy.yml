@@ -1,0 +1,41 @@
+name: Deploy Simulation to EC2
+
+on:
+  push:
+    branches: [deploy]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 54.116.93.66
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/simulation
+
+            # 코드 업데이트
+            git pull origin deploy
+
+            # Docker 이미지 빌드 + 컨테이너 재시작
+            docker stop sim_snowman 2>/dev/null || true
+            docker rm sim_snowman 2>/dev/null || true
+            docker build -t sim_image .
+            docker run -d --name sim_snowman \
+              --network host \
+              -e USE_SSH_TUNNEL=false \
+              -e DB_HOST=snowman-rds.cr8kguie4i7g.ap-northeast-2.rds.amazonaws.com \
+              -e DB_PORT=5432 \
+              -e DB_NAME=postgres \
+              -e DB_USER=postgres \
+              -e "DB_PASS=!postgres01" \
+              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -p 8001:8000 \
+              sim_image
+
+            echo "Deployment complete!"
