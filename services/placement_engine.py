@@ -960,7 +960,9 @@ def auto_place_products(room, features, products, weights=None, wall_order=None,
                 "mount_type": mount_type,
             })
             placements.append({
+                "product_id": product["product_id"],
                 "model": product["model"],
+                "name": product["name"],
                 "x_mm": best_pos["x"],
                 "y_mm": best_pos["y"],
                 "rotation": best_pos["rotation"],
