@@ -86,7 +86,7 @@ def create_session(body: SessionCreate):
         cur.execute(
             "INSERT INTO placement_group (user_id, floor_plan_id, group_name) "
             "VALUES (%s, %s, %s) RETURNING group_id",
-            (1, body.floor_plan_id, body.session_name),
+            (body.user_id, body.floor_plan_id, body.session_name),
         )
         group_id = cur.fetchone()["group_id"]
         return _get_session_out(conn, group_id)
@@ -554,50 +554,32 @@ def _build_3d_prompt(plan, rooms, placements_by_room, interior_style: str | None
 
     WALL_KR = {"north": "north", "south": "south", "east": "east", "west": "west"}
 
+    # 가구가 있는 방을 먼저, 없는 방은 간략하게
+    SKIP_TYPES = {"bathroom", "balcony"}  # 가구 없으면 생략할 방 유형
+    rooms_with_furniture = []
+    rooms_without = []
+
     for room in rooms:
         room_id = room["room_id"] if "room_id" in room else room.get("id")
+        pls = placements_by_room.get(room_id, [])
+        if pls:
+            rooms_with_furniture.append((room, pls))
+        else:
+            rooms_without.append(room)
+
+    for room, pls in rooms_with_furniture:
         room_name = room.get("name", "")
         room_type = room.get("room_type", "")
         w_m = round(room["width_mm"] / 1000, 1)
         h_m = round(room["height_mm"] / 1000, 1)
-        x_m = round(room["x_mm"] / 1000, 1)
-        y_m = round(room["y_mm"] / 1000, 1)
         type_desc = ROOM_TYPE_DESC.get(room_type, room_type)
 
-        # 방 구조 설명 (문, 창문, 수전 등)
+        # 창문만 간략히 표시
         features = room.get("features", [])
         if not isinstance(features, list):
             features = []
-
-        structure_parts = []
-        for feat in features:
-            feat_type = feat.get("type", "")
-            feat_wall = WALL_KR.get(feat.get("wall", ""), feat.get("wall", ""))
-            feat_width = feat.get("width", 0)
-            feat_w_m = round(feat_width / 1000, 1) if feat_width else 0
-            feat_desc = FEATURE_DESC.get(feat_type, feat_type)
-
-            if feat_type == "window":
-                structure_parts.append(f"{feat_w_m}m wide window on {feat_wall} wall")
-            elif feat_type == "door":
-                door_type = feat.get("door_type", "swing")
-                structure_parts.append(f"{door_type} door on {feat_wall} wall")
-            elif feat_type in ("water_hookup", "gas_line"):
-                structure_parts.append(f"{feat_desc} on {feat_wall} wall")
-            elif feat_type == "fixture":
-                label = feat.get("label", "fixture")
-                structure_parts.append(f"{label} on {feat_wall} wall")
-
-        structure_str = "; ".join(structure_parts) if structure_parts else "no special features"
-
-        # 배치 가구
-        pls = placements_by_room.get(room_id, [])
-        if not pls:
-            lines.append(
-                f"- {room_name} ({type_desc}, {w_m}x{h_m}m at position {x_m},{y_m}m): "
-                f"Structure: {structure_str}. No furniture placed."
-            )
-            continue
+        windows = [f for f in features if f.get("type") == "window"]
+        window_str = f", {len(windows)} window(s)" if windows else ""
 
         items = []
         for pl in pls:
@@ -607,16 +589,18 @@ def _build_3d_prompt(plan, rooms, placements_by_room, interior_style: str | None
                 prod = pl.get("product")
                 cat = prod.get("category", "unknown") if prod else "unknown"
                 name = name or (prod.get("name", "") if prod else "")
-
-            label = name if name else cat
+            label = cat if cat else name  # 카테고리만 사용 (간결)
             pos_desc = _wall_label("", room["width_mm"], room["height_mm"], pl.get("x_mm", 0), pl.get("y_mm", 0))
-            items.append(f"{label} (at {pos_desc})")
+            items.append(f"{label} ({pos_desc})")
 
-        items_str = "; ".join(items)
-        lines.append(
-            f"- {room_name} ({type_desc}, {w_m}x{h_m}m at position {x_m},{y_m}m): "
-            f"Structure: {structure_str}. Furniture: {items_str}."
-        )
+        items_str = ", ".join(items)
+        lines.append(f"- {room_name} ({w_m}x{h_m}m{window_str}): {items_str}")
+
+    # 빈 방은 한 줄로 요약 (작은 방은 생략)
+    non_skip = [r for r in rooms_without if r.get("room_type", "") not in SKIP_TYPES]
+    if non_skip:
+        names = [r.get("name", "") for r in non_skip]
+        lines.append(f"- Other rooms (empty): {', '.join(names)}")
 
     lines.append("")
     lines.append("CRITICAL: You MUST exactly replicate the furniture positions shown in the attached 2D floor plan image. Every piece of furniture must be placed in the same location as the 2D layout - do NOT move, rearrange, or reposition any item.")
@@ -804,21 +788,27 @@ class SaveSnapshotRequest(BaseModel):
 
 
 @router.get("/snapshots")
-def list_snapshots():
+def list_snapshots(user_id: int = None):
     """저장된 스냅샷이 있는 세션 목록 조회."""
     with get_db() as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT pg.group_id, pg.group_name, pg.saved_at,
+        params = []
+        query_extra = ""
+        if user_id is not None:
+            query_extra = " AND pg.user_id = %s"
+            params.append(user_id)
+        full_query = """
+            SELECT pg.group_id, pg.group_name, pg.saved_at, pg.user_id,
                    pg.snapshot_2d IS NOT NULL AS has_2d,
                    pg.snapshot_3d_url IS NOT NULL AS has_3d,
+                   pg.snapshot_2d,
                    pg.snapshot_3d_url,
                    fp.name AS floor_plan_name, fp.category, fp.total_area_m2
             FROM placement_group pg
             JOIN floor_plan fp ON fp.floor_plan_id = pg.floor_plan_id
-            WHERE pg.snapshot_2d IS NOT NULL OR pg.snapshot_3d_url IS NOT NULL
-            ORDER BY pg.saved_at DESC NULLS LAST
-        """)
+            WHERE (pg.snapshot_2d IS NOT NULL OR pg.snapshot_3d_url IS NOT NULL)
+        """ + query_extra + " ORDER BY pg.saved_at DESC NULLS LAST"
+        cur.execute(full_query, params)
         rows = cur.fetchall()
         return [
             {
@@ -829,6 +819,7 @@ def list_snapshots():
                 "area_m2": float(r["total_area_m2"]) if r["total_area_m2"] else None,
                 "has_2d": r["has_2d"],
                 "has_3d": r["has_3d"],
+                "snapshot_2d": r["snapshot_2d"],
                 "snapshot_3d_url": r["snapshot_3d_url"],
                 "saved_at": r["saved_at"].isoformat() if r["saved_at"] else None,
             }

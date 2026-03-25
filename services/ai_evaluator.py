@@ -189,11 +189,34 @@ def _fallback_evaluation(layouts: list[dict]) -> dict:
     """Fallback when AI is unavailable - use internal metrics."""
     rankings = []
     for layout in layouts:
+        metrics = layout["metrics"]
+        # 높은 점수 항목을 장점으로
+        pros_parts = []
+        if metrics.get("circulation", 0) >= 80:
+            pros_parts.append("동선 효율이 좋습니다")
+        if metrics.get("center_openness", 0) >= 80:
+            pros_parts.append("중앙 개방감이 확보되었습니다")
+        if metrics.get("space_usage", 0) >= 70:
+            pros_parts.append("공간 활용도가 높습니다")
+        if metrics.get("wall_balance", 0) >= 70:
+            pros_parts.append("가구 배치 균형이 좋습니다")
+        if not pros_parts:
+            pros_parts.append("안정적인 배치입니다")
+
+        # 낮은 점수 항목을 단점으로
+        cons_parts = []
+        if metrics.get("space_usage", 100) < 50:
+            cons_parts.append("공간 활용도가 낮습니다")
+        if metrics.get("wall_balance", 100) < 50:
+            cons_parts.append("가구 배치가 한쪽에 치우쳐 있습니다")
+        if metrics.get("circulation", 100) < 60:
+            cons_parts.append("이동 동선이 좁을 수 있습니다")
+
         rankings.append({
             "layout_id": layout["id"],
-            "score": round(layout["metrics"]["total"], 1),
-            "pros": layout["desc"],
-            "cons": "",
+            "score": round(metrics["total"], 1),
+            "pros": ". ".join(pros_parts),
+            "cons": ". ".join(cons_parts) if cons_parts else "특별한 단점 없음",
         })
     rankings.sort(key=lambda r: r["score"], reverse=True)
 

@@ -1,10 +1,12 @@
 import os
 import sys
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+load_dotenv()
 sys.path.insert(0, os.path.dirname(__file__))
 
 from db import get_db, stop_tunnel

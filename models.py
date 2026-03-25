@@ -63,6 +63,7 @@ class FloorPlanOut(BaseModel):
 class SessionCreate(BaseModel):
     floor_plan_id: int
     session_name: str = "새 배치"
+    user_id: int = 1
 
 
 class SessionOut(BaseModel):
