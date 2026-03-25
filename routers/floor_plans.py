@@ -346,6 +346,9 @@ def _get_rooms(conn, plan_id: int) -> list[FloorPlanRoomOut]:
 
 def _room_to_out(r) -> FloorPlanRoomOut:
     features = r["features"] if isinstance(r["features"], list) else []
+    open_walls = r.get("open_walls", []) or []
+    if not isinstance(open_walls, list):
+        open_walls = []
     return FloorPlanRoomOut(
         id=r["room_id"], floor_plan_id=r["floor_plan_id"],
         name=r["name"], room_type=r["room_type"],
@@ -353,6 +356,7 @@ def _room_to_out(r) -> FloorPlanRoomOut:
         width_mm=r["width_mm"], height_mm=r["height_mm"],
         is_placeable=bool(r["is_placeable"]),
         features=features,
+        open_walls=open_walls,
     )
 
 

@@ -44,6 +44,7 @@ class FloorPlanRoomOut(BaseModel):
     height_mm: float
     is_placeable: bool = True
     features: list[dict] = []
+    open_walls: list[str] = []
 
 
 class FloorPlanOut(BaseModel):
