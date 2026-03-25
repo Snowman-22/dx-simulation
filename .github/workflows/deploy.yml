@@ -27,7 +27,6 @@ jobs:
             docker rm sim_snowman 2>/dev/null || true
             docker build -t sim_image .
             docker run -d --name sim_snowman \
-              --network host \
               -e USE_SSH_TUNNEL=false \
               -e DB_HOST=snowman-rds.cr8kguie4i7g.ap-northeast-2.rds.amazonaws.com \
               -e DB_PORT=5432 \
