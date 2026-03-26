@@ -842,8 +842,8 @@ def _get_adjacent_door_zones(current_room, all_rooms) -> list[tuple]:
     """프론트 getAdjacentDoorZones 포팅 — 인접 방의 문이 현재 방 벽에 닿으면 통행 구역 생성."""
     zones = []
     cr = current_room
-    margin = 80
-    depth = 400
+    margin = 200
+    depth = 600
     cr_x, cr_y = cr["x_mm"], cr["y_mm"]
     cr_w, cr_h = cr["width_mm"], cr["height_mm"]
 
