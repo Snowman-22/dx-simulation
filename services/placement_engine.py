@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from services.constraint_validator import (
     get_footprint, get_rect, rects_overlap,
-    get_door_swing_rect, get_door_passage_zone, get_window_zone,
+    get_door_swing_rect, get_door_passage_zone, get_door_entry_zone, get_window_zone,
     get_fixture_zone, validate_single_placement,
 )
 
@@ -468,6 +468,7 @@ def _score_candidate(
     wall: str,
     mount_type: str = "floor",
     weights: dict | None = None,
+    open_walls: set | None = None,
 ) -> float:
     w = weights or WEIGHT_PRESETS["default"]
     is_wall_mount = mount_type == "wall"
@@ -481,6 +482,23 @@ def _score_candidate(
 
     for orect in occupied:
         if rects_overlap(rect, orect):
+            return float("-inf")
+
+    # 투명벽(open_walls) 통행 구역 → 실격
+    open_walls = open_walls or set()
+    open_margin = 300
+    for wall in open_walls:
+        if wall == "north":
+            oz = (0, 0, room_w, open_margin)
+        elif wall == "south":
+            oz = (0, room_h - open_margin, room_w, room_h)
+        elif wall == "west":
+            oz = (0, 0, open_margin, room_h)
+        elif wall == "east":
+            oz = (room_w - open_margin, 0, room_w, room_h)
+        else:
+            continue
+        if rects_overlap(rect, oz):
             return float("-inf")
 
     # 빌트인 설비 영역 충돌 → 실격
@@ -521,6 +539,11 @@ def _score_candidate(
                 passage_rect = get_door_passage_zone(feat, room_w, room_h)
                 if rects_overlap(rect, passage_rect):
                     return float("-inf")  # 문 통행 구역도 즉시 탈락
+
+                # 문 진입 구역 체크 (반대쪽 접근 방향)
+                entry_rect = get_door_entry_zone(feat, room_w, room_h)
+                if rects_overlap(rect, entry_rect):
+                    return float("-inf")  # 문 진입 구역도 즉시 탈락
 
                 # 문 근처 추가 감점
                 fx, fy = _feature_position(feat, room_w, room_h)
@@ -828,6 +851,7 @@ def auto_place_products(room, features, products, weights=None, wall_order=None,
     room_w = room["width_mm"]
     room_h = room["height_mm"]
     features_list = [dict(f) for f in features]
+    room_open_walls = set(room.get("open_walls") or [])
 
     if pre_sorted:
         sorted_products = list(products)  # Keep strategy sort order
@@ -891,7 +915,7 @@ def auto_place_products(room, features, products, weights=None, wall_order=None,
                             cx, cy, rotation, pw, pd, product["category"],
                             profile, room_w, room_h, features_list,
                             occupied_rects, placed_items, "center",
-                            mount_type, weights,
+                            mount_type, weights, room_open_walls,
                         )
                         if profile.wall_affinity == "none":
                             center_dist = _distance(cx, cy, room_w / 2, room_h / 2)
@@ -910,7 +934,7 @@ def auto_place_products(room, features, products, weights=None, wall_order=None,
                             c["x"], c["y"], rotation, pw, pd, product["category"],
                             profile, room_w, room_h, features_list,
                             occupied_rects, placed_items, wall,
-                            mount_type, weights,
+                            mount_type, weights, room_open_walls,
                         )
                         if s > float("-inf"):
                             all_candidates.append((s, {"x": c["x"], "y": c["y"], "rotation": rotation, "wall": wall}))
@@ -925,7 +949,7 @@ def auto_place_products(room, features, products, weights=None, wall_order=None,
                                 c["x"], c["y"], rotation, pw, pd, product["category"],
                                 profile, room_w, room_h, features_list,
                                 occupied_rects, placed_items, wall,
-                                mount_type, weights,
+                                mount_type, weights, room_open_walls,
                             )
                             if s > float("-inf"):
                                 all_candidates.append((s, {"x": c["x"], "y": c["y"], "rotation": rotation, "wall": wall}))
