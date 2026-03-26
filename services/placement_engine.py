@@ -564,10 +564,7 @@ def _score_candidate(
             if feat.get("type") == "window":
                 win_zone = get_window_zone(feat, room_w, room_h)
                 if rects_overlap(rect, win_zone):
-                    if "window" in profile.avoid_features:
-                        score -= 1500
-                    else:
-                        score -= 800
+                    return float("-inf")  # 창문 앞 배치 즉시 탈락
 
     # ── NEAR FEATURE BONUS ──
     for feat_type in profile.near_features:
