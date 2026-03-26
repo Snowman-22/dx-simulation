@@ -545,11 +545,11 @@ def _score_candidate(
                 if rects_overlap(rect, entry_rect):
                     return float("-inf")  # 문 진입 구역도 즉시 탈락
 
-                # 문 근처 추가 감점
+                # 문 근처 추가 감점 (더 넓은 범위)
                 fx, fy = _feature_position(feat, room_w, room_h)
                 dist = _distance(cx, cy, fx, fy)
-                if dist < 800:
-                    score -= 400 * w["door_penalty"]
+                if dist < 1200:
+                    score -= 600 * w["door_penalty"]
 
     # ── WINDOW PENALTY (벽면 제품은 창문 위에 설치 가능 → 면제, 오히려 창문 근처 선호) ──
     if is_wall_mount:
