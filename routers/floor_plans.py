@@ -980,3 +980,16 @@ def get_chat_history(user_id: int):
             }
             for r in rows
         ]
+
+
+@router.get("/user/{user_id}/cart-chats")
+def get_user_cart_chats(user_id: int):
+    """사용자의 chatId 목록 조회 (장바구니 조회용)."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT chat_conv_id FROM chat WHERE user_id = %s AND chat_conv_id IS NOT NULL ORDER BY start_date DESC LIMIT 20",
+            (user_id,),
+        )
+        rows = cur.fetchall()
+        return [{"chat_id": r["chat_conv_id"]} for r in rows]
