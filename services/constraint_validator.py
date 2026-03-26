@@ -39,72 +39,53 @@ def rects_overlap(r1, r2) -> bool:
 
 
 def get_door_swing_rect(door: dict, room_width: float, room_height: float):
-    """문 열림 아크 — 안쪽+바깥쪽 양방향. 문 너비 + 200mm 여유."""
+    """문 열림 아크 — 미닫이문은 없음, 여닫이문은 문 너비만큼."""
     if door.get("door_type") == "slide":
         return (0, 0, 0, 0)
-
     wall = door["wall"]
     offset = door["offset"]
     dw = door["width"]
-    swing = dw + 200  # 문 열림 반경
+    if wall == "north":
+        return (offset, 0, offset + dw, dw)
+    elif wall == "south":
+        return (offset, room_height - dw, offset + dw, room_height)
+    elif wall == "west":
+        return (0, offset, dw, offset + dw)
+    else:
+        return (room_width - dw, offset, room_width, offset + dw)
+
+
+def get_door_clearance_zone(door: dict, room_width: float, room_height: float):
+    """문 제한 구역 — 문 양옆 100mm, 벽에서 앞뒤 200mm.
+    이 영역에는 어떤 가전/가구도 배치 불가."""
+    wall = door["wall"]
+    offset = door["offset"]
+    dw = door["width"]
+    side_margin = 100   # 문 양옆 여유
+    front_depth = 200   # 문 앞뒤 깊이
 
     if wall == "north":
-        return (max(0, offset - 100), 0, min(room_width, offset + dw + 100), swing)
+        return (max(0, offset - side_margin), 0,
+                min(room_width, offset + dw + side_margin), front_depth)
     elif wall == "south":
-        return (max(0, offset - 100), room_height - swing, min(room_width, offset + dw + 100), room_height)
+        return (max(0, offset - side_margin), room_height - front_depth,
+                min(room_width, offset + dw + side_margin), room_height)
     elif wall == "west":
-        return (0, max(0, offset - 100), swing, min(room_height, offset + dw + 100))
+        return (0, max(0, offset - side_margin),
+                front_depth, min(room_height, offset + dw + side_margin))
     else:
-        return (room_width - swing, max(0, offset - 100), room_width, min(room_height, offset + dw + 100))
-
-
+        return (room_width - front_depth, max(0, offset - side_margin),
+                room_width, min(room_height, offset + dw + side_margin))
 
 
 def get_door_passage_zone(door: dict, room_width: float, room_height: float):
-    """문 앞 통행 구역: 문 너비 + 양옆 여유, 깊이.
-    미닫이문은 스윙 없이 옆으로 밀리므로 통행 구역을 줄임.
-    사람이 지나다닐 수 있도록 이 영역에는 가전/가구를 배치하면 안 됨."""
-    wall = door["wall"]
-    offset = door["offset"]
-    dw = door["width"]
-    is_slide = door.get("door_type") == "slide"
-    margin = 150 if is_slide else 300    # 문 양옆 여유
-    depth = 400 if is_slide else 600     # 통행 깊이
-
-    if wall == "north":
-        return (max(0, offset - margin), 0,
-                min(room_width, offset + dw + margin), depth)
-    elif wall == "south":
-        return (max(0, offset - margin), room_height - depth,
-                min(room_width, offset + dw + margin), room_height)
-    elif wall == "west":
-        return (0, max(0, offset - margin),
-                depth, min(room_height, offset + dw + margin))
-    else:
-        return (room_width - depth, max(0, offset - margin),
-                room_width, min(room_height, offset + dw + margin))
+    """하위 호환용 — get_door_clearance_zone과 동일."""
+    return get_door_clearance_zone(door, room_width, room_height)
 
 
 def get_door_entry_zone(door: dict, room_width: float, room_height: float):
-    """문 진입 방향(바깥쪽) 통행 구역.
-    문이 있는 벽의 반대쪽(방 안쪽)에서 문으로 접근하는 경로."""
-    wall = door["wall"]
-    offset = door["offset"]
-    dw = door["width"]
-    is_slide = door.get("door_type") == "slide"
-    margin = 100 if is_slide else 200
-    depth = 200 if is_slide else 500
-
-    # 문이 벽에 있으면 방 안쪽에서 접근하는 구역
-    if wall == "north":
-        return (max(0, offset - margin), 0,
-                min(room_width, offset + dw + margin), depth)
-    elif wall == "south":
-        return (max(0, offset - margin), room_height - depth,
-                min(room_width, offset + dw + margin), room_height)
-    elif wall == "west":
-        return (0, max(0, offset - margin),
-                depth, min(room_height, offset + dw + margin))
+    """하위 호환용 — get_door_clearance_zone과 동일."""
+    return get_door_clearance_zone(door, room_width, room_height)
     else:
         return (room_width - depth, max(0, offset - margin),
                 room_width, min(room_height, offset + dw + margin))

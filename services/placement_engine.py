@@ -838,8 +838,62 @@ def _get_profile_key(product) -> str:
     return category
 
 
+def _get_adjacent_door_zones(current_room, all_rooms) -> list[tuple]:
+    """프론트 getAdjacentDoorZones 포팅 — 인접 방의 문이 현재 방 벽에 닿으면 통행 구역 생성."""
+    zones = []
+    cr = current_room
+    margin = 300
+    depth = 700
+    cr_x, cr_y = cr["x_mm"], cr["y_mm"]
+    cr_w, cr_h = cr["width_mm"], cr["height_mm"]
+
+    for other in all_rooms:
+        if other.get("id") == cr.get("id"):
+            continue
+        or_x, or_y = other["x_mm"], other["y_mm"]
+        or_w, or_h = other["width_mm"], other["height_mm"]
+        for feat in (other.get("features") or []):
+            if feat.get("type") != "door":
+                continue
+            offset = feat["offset"]
+            dw = feat["width"]
+            wall = feat["wall"]
+
+            if wall in ("north", "south"):
+                door_gx = or_x + offset
+                door_gy = or_y if wall == "north" else or_y + or_h
+                dx1, dx2 = door_gx, door_gx + dw
+                overlap = max(0, min(dx2, cr_x + cr_w) - max(dx1, cr_x))
+                if overlap <= 0:
+                    continue
+                if abs(door_gy - cr_y) < 5:
+                    lx = max(0, dx1 - cr_x - margin)
+                    rx = min(cr_w, dx2 - cr_x + margin)
+                    zones.append((lx, 0, rx, depth))
+                elif abs(door_gy - (cr_y + cr_h)) < 5:
+                    lx = max(0, dx1 - cr_x - margin)
+                    rx = min(cr_w, dx2 - cr_x + margin)
+                    zones.append((lx, cr_h - depth, rx, cr_h))
+            else:
+                door_gx = or_x if wall == "west" else or_x + or_w
+                door_gy = or_y + offset
+                dy1, dy2 = door_gy, door_gy + dw
+                overlap = max(0, min(dy2, cr_y + cr_h) - max(dy1, cr_y))
+                if overlap <= 0:
+                    continue
+                if abs(door_gx - cr_x) < 5:
+                    ty = max(0, dy1 - cr_y - margin)
+                    by = min(cr_h, dy2 - cr_y + margin)
+                    zones.append((0, ty, depth, by))
+                elif abs(door_gx - (cr_x + cr_w)) < 5:
+                    ty = max(0, dy1 - cr_y - margin)
+                    by = min(cr_h, dy2 - cr_y + margin)
+                    zones.append((cr_w - depth, ty, cr_w, by))
+    return zones
+
+
 def auto_place_products(room, features, products, weights=None, wall_order=None,
-                        pre_sorted=False, diversity_k=1) -> dict:
+                        pre_sorted=False, diversity_k=1, all_rooms=None) -> dict:
     """Place products within a single room using greedy scoring.
 
     Args:
@@ -861,8 +915,11 @@ def auto_place_products(room, features, products, weights=None, wall_order=None,
             key=lambda p: PROFILES.get(_get_profile_key(p), DEFAULT_PROFILE).priority
         )
 
+    # 인접 방 문 통행 구역을 미리 계산
+    adjacent_door_zones = _get_adjacent_door_zones(room, all_rooms or [])
+
     # 바닥 제품과 벽면 제품의 occupied_rects 분리
-    floor_occupied: list[tuple] = []
+    floor_occupied: list[tuple] = list(adjacent_door_zones)  # 인접 문 구역은 기본 차단
     wall_occupied: list[tuple] = []
     placed_items: list[dict] = []  # track category + position for relationship rules
     placements = []
@@ -1313,6 +1370,7 @@ def auto_place_floor_plan(rooms, products, strategy=None) -> dict:
         result = auto_place_products(
             room, extra_features, sorted_prods, strat_weights, wall_order,
             pre_sorted=(order != "default"), diversity_k=diversity_k,
+            all_rooms=rooms,
         )
 
         for p in result["placements"]:
