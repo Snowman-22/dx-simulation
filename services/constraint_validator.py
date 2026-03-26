@@ -39,22 +39,25 @@ def rects_overlap(r1, r2) -> bool:
 
 
 def get_door_swing_rect(door: dict, room_width: float, room_height: float):
-    # Sliding doors have no swing zone
+    """문 열림 아크 — 안쪽+바깥쪽 양방향. 문 너비 + 200mm 여유."""
     if door.get("door_type") == "slide":
         return (0, 0, 0, 0)
 
     wall = door["wall"]
     offset = door["offset"]
     dw = door["width"]
+    swing = dw + 200  # 문 열림 반경
 
     if wall == "north":
-        return (offset, 0, offset + dw, dw)
+        return (max(0, offset - 100), 0, min(room_width, offset + dw + 100), swing)
     elif wall == "south":
-        return (offset, room_height - dw, offset + dw, room_height)
+        return (max(0, offset - 100), room_height - swing, min(room_width, offset + dw + 100), room_height)
     elif wall == "west":
-        return (0, offset, dw, offset + dw)
+        return (0, max(0, offset - 100), swing, min(room_height, offset + dw + 100))
     else:
-        return (room_width - dw, offset, room_width, offset + dw)
+        return (room_width - swing, max(0, offset - 100), room_width, min(room_height, offset + dw + 100))
+
+
 
 
 def get_door_passage_zone(door: dict, room_width: float, room_height: float):
@@ -65,8 +68,8 @@ def get_door_passage_zone(door: dict, room_width: float, room_height: float):
     offset = door["offset"]
     dw = door["width"]
     is_slide = door.get("door_type") == "slide"
-    margin = 200 if is_slide else 400    # 문 양옆 여유
-    depth = 500 if is_slide else 1200    # 통행 깊이 (소파 등 대형 가구 차단)
+    margin = 150 if is_slide else 300    # 문 양옆 여유
+    depth = 400 if is_slide else 600     # 통행 깊이
 
     if wall == "north":
         return (max(0, offset - margin), 0,
