@@ -126,6 +126,7 @@ def get_fixture_zone(fixture: dict, room_width: float, room_height: float):
 def validate_single_placement(
     x: float, y: float, rotation: int,
     product, room, features: list[dict], other_placements,
+    all_rooms: list | None = None,
 ) -> list[str]:
     """Validate a single placement. Returns list of violation messages."""
     violations = []
@@ -211,5 +212,61 @@ def validate_single_placement(
             if rects_overlap(rect, fix_zone):
                 label = feat.get("label", "빌트인 설비")
                 violations.append(f"빌트인 설비 영역 침범 ({label}, {feat['wall']}벽)")
+
+    # 6. 인접 방 문 통행 구역 (프론트와 동일 로직)
+    if all_rooms and my_mount != "wall":
+        adj_margin = 200
+        adj_depth = 600
+        cr_x, cr_y = room.get("x_mm", 0), room.get("y_mm", 0)
+        cr_w, cr_h = room_w, room_h
+        room_id = room.get("id") or room.get("room_id")
+
+        for other in all_rooms:
+            other_id = other.get("id") or other.get("room_id")
+            if other_id == room_id:
+                continue
+            or_x, or_y = other.get("x_mm", 0), other.get("y_mm", 0)
+            or_w, or_h = other.get("width_mm", 0), other.get("height_mm", 0)
+            for ofeat in (other.get("features") or []):
+                if ofeat.get("type") != "door":
+                    continue
+                o_offset = ofeat["offset"]
+                o_dw = ofeat["width"]
+                o_wall = ofeat["wall"]
+
+                if o_wall in ("north", "south"):
+                    door_gx = or_x + o_offset
+                    door_gy = or_y if o_wall == "north" else or_y + or_h
+                    dx1, dx2 = door_gx, door_gx + o_dw
+                    overlap = max(0, min(dx2, cr_x + cr_w) - max(dx1, cr_x))
+                    if overlap <= 0:
+                        continue
+                    if abs(door_gy - cr_y) < 5:
+                        lx = max(0, dx1 - cr_x - adj_margin)
+                        rx = min(cr_w, dx2 - cr_x + adj_margin)
+                        if rects_overlap(rect, (lx, 0, rx, adj_depth)):
+                            violations.append("인접 방 문 통행 구역 침범")
+                    elif abs(door_gy - (cr_y + cr_h)) < 5:
+                        lx = max(0, dx1 - cr_x - adj_margin)
+                        rx = min(cr_w, dx2 - cr_x + adj_margin)
+                        if rects_overlap(rect, (lx, cr_h - adj_depth, rx, cr_h)):
+                            violations.append("인접 방 문 통행 구역 침범")
+                else:
+                    door_gx = or_x if o_wall == "west" else or_x + or_w
+                    door_gy = or_y + o_offset
+                    dy1, dy2 = door_gy, door_gy + o_dw
+                    overlap = max(0, min(dy2, cr_y + cr_h) - max(dy1, cr_y))
+                    if overlap <= 0:
+                        continue
+                    if abs(door_gx - cr_x) < 5:
+                        ty = max(0, dy1 - cr_y - adj_margin)
+                        by = min(cr_h, dy2 - cr_y + adj_margin)
+                        if rects_overlap(rect, (0, ty, adj_depth, by)):
+                            violations.append("인접 방 문 통행 구역 침범")
+                    elif abs(door_gx - (cr_x + cr_w)) < 5:
+                        ty = max(0, dy1 - cr_y - adj_margin)
+                        by = min(cr_h, dy2 - cr_y + adj_margin)
+                        if rects_overlap(rect, (cr_w - adj_depth, ty, cr_w, by)):
+                            violations.append("인접 방 문 통행 구역 침범")
 
     return violations

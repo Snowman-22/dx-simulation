@@ -1754,14 +1754,15 @@ def _evo_get_others_in_room(state, room_id, exclude_model, product_lookup):
     return others
 
 
-def _evo_is_valid(x, y, rotation, product, room, features, others):
-    return len(validate_single_placement(x, y, rotation, product, room, features, others)) == 0
+def _evo_is_valid(x, y, rotation, product, room, features, others, all_rooms=None):
+    return len(validate_single_placement(x, y, rotation, product, room, features, others, all_rooms=all_rooms)) == 0
 
 
 def _evo_mutate_one(state, rooms_map, features_map, product_lookup):
     """제품 하나를 랜덤 이동 (shift/rotate/rewall/swap).
     Returns: (new_state, True) 또는 (None, False)
     """
+    all_rooms_list = list(rooms_map.values())
     if not state:
         return None, False
 
@@ -1842,13 +1843,13 @@ def _evo_mutate_one(state, rooms_map, features_map, product_lookup):
             croom = rooms_map.get(cp["room_id"])
             cfeats = features_map.get(cp["room_id"], [])
             cothers = _evo_get_others_in_room(new_state, cp["room_id"], cp["model"], product_lookup)
-            if not _evo_is_valid(cp["x_mm"], cp["y_mm"], cp["rotation"], cprod, croom, cfeats, cothers):
+            if not _evo_is_valid(cp["x_mm"], cp["y_mm"], cp["rotation"], cprod, croom, cfeats, cothers, all_rooms_list):
                 return None, False
         return new_state, True  # swap은 위에서 이미 검증 완료
 
     # 유효성 검사 (swap 제외)
     others = _evo_get_others_in_room(new_state, pl["room_id"], pl["model"], product_lookup)
-    if _evo_is_valid(pl["x_mm"], pl["y_mm"], pl["rotation"], product, room, features, others):
+    if _evo_is_valid(pl["x_mm"], pl["y_mm"], pl["rotation"], product, room, features, others, all_rooms_list):
         return new_state, True
 
     return None, False
@@ -1999,7 +2000,7 @@ def _ga_crossover(parent_a, parent_b, rooms_map, features_map, product_lookup):
             continue
         features = features_map.get(pl["room_id"], [])
         others = _evo_get_others_in_room(child_placements, pl["room_id"], pl["model"], product_lookup)
-        if not _evo_is_valid(pl["x_mm"], pl["y_mm"], pl["rotation"], product, room, features, others):
+        if not _evo_is_valid(pl["x_mm"], pl["y_mm"], pl["rotation"], product, room, features, others, list(rooms_map.values())):
             # 겹치면 돌연변이로 새 위치 찾기
             temp_state = _evo_copy.deepcopy(child_placements)
             for _ in range(5):
