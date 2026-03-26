@@ -949,3 +949,29 @@ def get_representative_products(body: OwnedApplianceRequest):
                 })
 
         return result
+
+
+# ──────────────────────────────────────────────
+#  채팅 내역 조회 (chat 테이블)
+# ──────────────────────────────────────────────
+
+@router.get("/chat-history")
+def get_chat_history(user_id: int):
+    """사용자의 채팅 내역 목록 조회."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT chat_id, chat_conv_id, chat_title, start_date "
+            "FROM chat WHERE user_id = %s ORDER BY start_date DESC LIMIT 20",
+            (user_id,),
+        )
+        rows = cur.fetchall()
+        return [
+            {
+                "id": r["chat_conv_id"],
+                "title": r["chat_title"] or "상담 내역",
+                "summary": "",
+                "time": r["start_date"].isoformat() if r["start_date"] else None,
+            }
+            for r in rows
+        ]
