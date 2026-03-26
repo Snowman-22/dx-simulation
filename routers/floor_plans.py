@@ -613,6 +613,7 @@ def _build_3d_prompt(plan, rooms, placements_by_room, interior_style: str | None
 
     lines.append("")
     lines.append("CRITICAL: You MUST exactly replicate the furniture positions shown in the attached 2D floor plan image. Every piece of furniture must be placed in the same location as the 2D layout - do NOT move, rearrange, or reposition any item.")
+    lines.append("CRITICAL: You MUST include ALL listed appliances and furniture in the 3D rendering. Every product mentioned above (TV, refrigerator, washing machine, air conditioner, sofa, bed, desk, etc.) MUST be clearly visible in the image. Do NOT omit any product.")
     lines.append("IMPORTANT: Match the exact room positions, proportions, and wall features (windows, doors) from the attached 2D floor plan.")
     lines.append("Show windows with natural light coming in, doors in correct positions, and all furniture exactly where shown in the 2D plan.")
     lines.append("Photorealistic quality, soft ambient lighting, no text or labels or annotations.")
