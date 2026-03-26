@@ -522,12 +522,18 @@ INTERIOR_STYLE_MAP = {
 }
 
 
-def _build_3d_prompt(plan, rooms, placements_by_room, interior_style: str | None = None) -> str:
+def _build_3d_prompt(
+    plan, rooms, placements_by_room,
+    interior_style: str | None = None,
+    lifestyle: list[str] | None = None,
+    budget: int | None = None,
+) -> str:
     """배치 데이터를 기반으로 상세 3D 프롬프트를 생성."""
     area = plan["total_area_m2"] or 0
     plan_name = plan["name"] if isinstance(plan["name"], str) else str(plan["name"])
     total_w = round(plan["total_width_mm"] / 1000, 1)
     total_h = round(plan["total_height_mm"] / 1000, 1)
+    category = plan.get("category", "")
 
     # 인테리어 스타일 설명
     style_desc = INTERIOR_STYLE_MAP.get(
@@ -535,14 +541,83 @@ def _build_3d_prompt(plan, rooms, placements_by_room, interior_style: str | None
         "Modern Korean interior style: warm wood flooring, white walls, natural daylight from windows.",
     )
 
+    # 도면 카테고리별 분위기
+    category_mood = {
+        "원룸": "Cozy and compact single-room atmosphere, efficient use of every corner.",
+        "오피스텔": "Modern urban studio/officetel feel, sleek and functional design.",
+        "아파트": "Spacious Korean apartment with open living areas and generous room sizes.",
+        "빌라": "Comfortable villa-style home with warm, family-friendly atmosphere.",
+    }
+    mood = category_mood.get(category, "")
+
+    # 예산대별 마감재
+    if budget and budget >= 600:
+        finish = "Premium high-end finishes: marble countertops, brass/gold accents, designer lighting fixtures, luxury curtains."
+    elif budget and budget >= 300:
+        finish = "Mid-range quality finishes: clean ceramic tiles, modern pendant lights, quality fabric curtains."
+    else:
+        finish = "Simple and clean finishes: basic flooring, minimalist lighting, functional furnishings."
+
+    # 라이프스타일 디테일
+    life_details = []
+    if lifestyle:
+        life_map = {
+            "요리를 자주 해요": "Kitchen should look well-equipped with cooking utensils visible, cutting board, and seasoning rack.",
+            "간단 요리를 자주 해요": "Kitchen with simple cooking setup, clean countertop with minimal utensils.",
+            "재택근무를 해요": "Home office area with good desk lighting, monitor stand, and organized workspace.",
+            "집에서 일하는 시간이 많아요": "Comfortable work-from-home setup with ergonomic chair and warm desk lamp.",
+            "집에서 보내는 시간이 많아요": "Cozy living space with plush throws, cushions, and warm ambient lighting.",
+            "반려동물과 함께 살아요": "Pet-friendly space with pet bed, food bowls visible, and scratch-resistant surfaces.",
+            "운동을 즐겨해요": "Fitness corner with yoga mat or small exercise equipment visible.",
+            "홈카페를 즐겨요": "Coffee corner with espresso machine, mugs on display, and cafe-style decor.",
+        }
+        for ls in lifestyle:
+            detail = life_map.get(ls)
+            if detail:
+                life_details.append(detail)
+
+    # 가구 종류별 디테일
+    all_categories = set()
+    for pls in placements_by_room.values():
+        for pl in pls:
+            cat = pl.get("category", "")
+            if not cat:
+                prod = pl.get("product")
+                cat = prod.get("category", "") if prod else ""
+            if cat:
+                all_categories.add(cat)
+
+    furniture_details = []
+    furniture_detail_map = {
+        "침대": "Bed with neatly made bedding, pillows, and a small bedside lamp.",
+        "소파": "Sofa with decorative cushions and a small side table nearby.",
+        "책상": "Desk with a modern desk lamp, stationery holder, and books.",
+        "TV": "TV mounted or on a stand with a clean media console.",
+        "냉장고": "Modern refrigerator with clean stainless steel or colored panel finish.",
+        "세탁기": "Washing machine in a clean laundry area with detergent bottle.",
+        "에어컨": "Wall-mounted or standing air conditioner with sleek design.",
+        "식탁·테이블": "Dining table with chairs, placemats, and a small centerpiece.",
+    }
+    for cat in all_categories:
+        detail = furniture_detail_map.get(cat)
+        if detail:
+            furniture_details.append(detail)
+
     lines = [
         f"Create a photorealistic 3D interior rendering of a {area}m² Korean apartment ({plan_name}).",
         f"The apartment is {total_w}m wide and {total_h}m deep.",
         f"Interior design: {style_desc}",
-        "Top-down bird's-eye view from directly above (90-degree angle), showing all rooms clearly.",
-        "",
-        "ROOM LAYOUT AND FURNITURE PLACEMENT:",
+        f"Material finish: {finish}",
     ]
+    if mood:
+        lines.append(f"Overall atmosphere: {mood}")
+    if life_details:
+        lines.append(f"Lifestyle details to include: {' '.join(life_details)}")
+    if furniture_details:
+        lines.append(f"Furniture styling: {' '.join(furniture_details)}")
+    lines.append("Top-down bird's-eye view from directly above (90-degree angle), showing all rooms clearly.")
+    lines.append("")
+    lines.append("ROOM LAYOUT AND FURNITURE PLACEMENT:")
 
     ROOM_TYPE_DESC = {
         "living": "living room",
@@ -686,6 +761,8 @@ def validate_move(session_id: int, room_id: int, body: ValidateMoveRequest):
 class Generate3DRequest(BaseModel):
     canvas_image: str | None = None  # Base64 PNG of 2D canvas (optional)
     interior_style: str | None = None  # 인테리어 스타일 (모던/미니멀, 내추럴/우드, 컬러풀/포인트)
+    lifestyle: list[str] | None = None  # 라이프스타일 (요리를 자주 해요, 재택근무를 해요 등)
+    budget: int | None = None  # 예산 (150, 300, 450, 600, 1000)
 
 
 @router.post("/sessions/{session_id}/generate-3d")
@@ -725,7 +802,9 @@ def generate_3d_image(session_id: int, body: Generate3DRequest | None = None):
             placements_by_room.setdefault(rid, []).append(dict(pl))
 
     interior_style = body.interior_style if body else None
-    prompt = _build_3d_prompt(dict(plan), [dict(r) for r in rooms], placements_by_room, interior_style)
+    lifestyle = body.lifestyle if body else None
+    budget = body.budget if body else None
+    prompt = _build_3d_prompt(dict(plan), [dict(r) for r in rooms], placements_by_room, interior_style, lifestyle, budget)
 
     client = OpenAI(api_key=OPENAI_API_KEY)
 
