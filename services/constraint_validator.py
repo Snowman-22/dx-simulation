@@ -147,8 +147,8 @@ def validate_single_placement(
     if out_west or out_north or out_east or out_south:
         violations.append("방 경계를 벗어남")
 
-    # 1-1. 투명벽(open_walls) 통행 구역 (300mm)
-    open_wall_margin = 300
+    # 1-1. 투명벽(open_walls) 통행 구역 (100mm)
+    open_wall_margin = 100
     for wall in open_walls:
         if wall == "north":
             zone = (0, 0, room_w, open_wall_margin)

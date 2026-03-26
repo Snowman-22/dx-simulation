@@ -486,7 +486,7 @@ def _score_candidate(
 
     # 투명벽(open_walls) 통행 구역 → 실격
     open_walls = open_walls or set()
-    open_margin = 300
+    open_margin = 100
     for wall in open_walls:
         if wall == "north":
             oz = (0, 0, room_w, open_margin)
