@@ -65,8 +65,8 @@ def get_door_passage_zone(door: dict, room_width: float, room_height: float):
     offset = door["offset"]
     dw = door["width"]
     is_slide = door.get("door_type") == "slide"
-    margin = 150 if is_slide else 300    # 문 양옆 여유
-    depth = 400 if is_slide else 900     # 통행 깊이
+    margin = 200 if is_slide else 400    # 문 양옆 여유
+    depth = 500 if is_slide else 1200    # 통행 깊이 (소파 등 대형 가구 차단)
 
     if wall == "north":
         return (max(0, offset - margin), 0,
