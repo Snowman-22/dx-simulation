@@ -215,8 +215,8 @@ def validate_single_placement(
 
     # 6. 인접 방 문 통행 구역 (프론트와 동일 로직)
     if all_rooms and my_mount != "wall":
-        adj_margin = 200
-        adj_depth = 600
+        adj_margin = 80
+        adj_depth = 400
         cr_x, cr_y = room.get("x_mm", 0), room.get("y_mm", 0)
         cr_w, cr_h = room_w, room_h
         room_id = room.get("id") or room.get("room_id")
