@@ -450,9 +450,12 @@ def generate_layouts(session_id: int, body: GenerateLayoutsRequest):
                 enriched.append(pl)
             layout["placements"] = enriched
 
-        # LLM 평가 임시 비활성화
-        # ai_eval = evaluate_layouts_with_ai(layouts, rooms)
-        ai_eval = None
+        # LLM 평가
+        try:
+            ai_eval = evaluate_layouts_with_ai(layouts, rooms)
+        except Exception as e:
+            print(f"[AI Eval] Failed: {e}")
+            ai_eval = None
 
         return {"layouts": layouts, "ai_evaluation": ai_eval}
 
