@@ -86,9 +86,6 @@ def get_door_passage_zone(door: dict, room_width: float, room_height: float):
 def get_door_entry_zone(door: dict, room_width: float, room_height: float):
     """하위 호환용 — get_door_clearance_zone과 동일."""
     return get_door_clearance_zone(door, room_width, room_height)
-    else:
-        return (room_width - depth, max(0, offset - margin),
-                room_width, min(room_height, offset + dw + margin))
 
 
 def get_window_zone(window: dict, room_width: float, room_height: float):
