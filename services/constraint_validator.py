@@ -56,13 +56,14 @@ def get_door_swing_rect(door: dict, room_width: float, room_height: float):
 
 
 def get_door_clearance_zone(door: dict, room_width: float, room_height: float):
-    """문 제한 구역 — 문 양옆 100mm, 벽에서 앞뒤 200mm.
-    이 영역에는 어떤 가전/가구도 배치 불가."""
+    """문 통행 구역 — 프론트와 동일한 규칙.
+    여닫이: margin 300mm, depth 700mm / 미닫이: margin 100mm, depth 300mm."""
     wall = door["wall"]
     offset = door["offset"]
     dw = door["width"]
-    side_margin = 100   # 문 양옆 여유
-    front_depth = 200   # 문 앞뒤 깊이
+    is_slide = door.get("door_type") == "slide"
+    side_margin = 100 if is_slide else 300
+    front_depth = 300 if is_slide else 700
 
     if wall == "north":
         return (max(0, offset - side_margin), 0,
